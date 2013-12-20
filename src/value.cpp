@@ -238,10 +238,29 @@ char *Value::as_c_str(unsigned long &size) const
     return 0;
   }
 
+  boost::uint32_t length_from_meta= m_metadata;
+
+  if (m_type == MYSQL_TYPE_STRING)
+  {
+    if (m_metadata >= 256)
+    {
+      uint byte0= m_metadata & 0xFF;
+      uint byte1= m_metadata >> 8;
+
+      /* a long CHAR() field: see #37426 */
+      if ((byte0 & 0x30) != 0x30)
+        length_from_meta= byte1 | (((byte0 & 0x30) ^ 0x30) << 4);
+      else
+        length_from_meta = m_metadata >> 8;
+    }
+    else
+      length_from_meta= m_metadata;
+  }
+
   /*
    Length encoded; First byte is length of string.
   */
-  int metadata_length= m_metadata > 255 ? 2 : 1;
+  int metadata_length= length_from_meta > 255 ? 2 : 1;
   /*
    Size is length of the character string; not of the entire storage
   */
